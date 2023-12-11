@@ -1,54 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use camelCase" #-}
+{-# HLINT ignore "Use tuple-section" #-}
 
 module Day05 where
 
 import Data.Attoparsec.Text as P
-import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Fmt
 import Paths_aoc2023 (getDataFileName)
 import Utils (digitsToInt, skipLine)
-import Data.List
 
-type Lookup = Int -> Int
+type Lookup = [(Int, Int)] -> [(Int, Int)]
+
 luEmpty :: Lookup
 luEmpty = id
 
-type LookupRev = Int -> Int
-constLookupRev :: Int -> Int -> Int -> Lookup -> Lookup
-constLookupRev d s r l k = let diff = k - d
-                          in
-                            if diff < r && diff >= 0 then s + diff
-                            else l k
-
--- dest, src, range, orElse lookup
-constLookup :: Int -> Int -> Int -> Lookup -> Lookup
-constLookup d s r l k = let diff = k - s
-                          in
-                            if diff < r && diff >= 0 then d + diff
-                            else l k
+constLookup :: (Int, Int, Int) -> Lookup -> Lookup
+constLookup = mapRanges
 
 data Lookups = Lookups
   { seeds :: [Int],
-    seedToSoil :: Int -> Int,
-    soilToFertizlier :: Int -> Int,
-    fertToWater :: Int -> Int,
-    waterToLight :: Int -> Int,
-    lightToTemp :: Int -> Int,
-    tempToHumidity :: Int -> Int,
-    humidityToLocation :: Int -> Int
+    seedToSoil :: Lookup,
+    soilToFertizlier :: Lookup,
+    fertToWater :: Lookup,
+    waterToLight :: Lookup,
+    lightToTemp :: Lookup,
+    tempToHumidity :: Lookup,
+    humidityToLocation :: Lookup
   }
 
-lupFns :: Lookups -> [Int -> Int]
+lupFns :: Lookups -> [Lookup]
 lupFns ls = [seedToSoil ls, soilToFertizlier ls, fertToWater ls, waterToLight ls, lightToTemp ls, tempToHumidity ls, humidityToLocation ls]
-locationToSeed, seedToLocation :: Lookups -> Int -> Int
 
+seedToLocation :: Lookups -> [(Int, Int)] -> [(Int, Int)]
 seedToLocation ls = foldr1 (.) $ reverse $ lupFns ls
-locationToSeed ls = 
-  seedToSoil ls . soilToFertizlier ls . fertToWater ls . waterToLight ls . lightToTemp ls . tempToHumidity ls . humidityToLocation ls
 
 lineParser :: Parser [Int]
 lineParser =
@@ -56,39 +44,62 @@ lineParser =
     chs <- sepBy (many1 digit) (many1 (char ' '))
     return (digitsToInt <$> chs)
 
-
-lineToLookup, lineToLookupRev :: [Int] -> Lookup -> Lookup
-lineToLookup (d : s : r : _) l =
-  constLookupRev d s r l
+lineToLookup :: [Int] -> Lookup -> Lookup
+lineToLookup (d : s : r : _) l = constLookup (d, s, r) l
 lineToLookup [] l = l
 lineToLookup l _ = error (fmt $ "expected a line with 3 elements, but got" +| l |+ ".")
 
-lineToLookupRev (d : s : r : _) l =
-  constLookupRev d s r l
-lineToLookupRev [] l = l
-lineToLookupRev l _ = error (fmt $ "expected a line with 3 elements, but got" +| l |+ ".")
-
-lookupParser :: Bool -> Parser Lookup
-lookupParser rev =
+lookupParser :: Parser Lookup
+lookupParser =
   do
     skipLine
     lines <- sepBy lineParser endOfLine
-    let lup = if rev then lineToLookupRev else lineToLookup
+    let lup = lineToLookup
     let lookup = foldr lup luEmpty lines
     return lookup
 
-dataParser :: Bool -> Parser Lookups
-dataParser rev =
+mapRanges :: (Int, Int, Int) -> Lookup -> Lookup
+mapRanges m d l =
+  l >>= mapRange m d
+
+mapRange :: (Int, Int, Int) -> Lookup -> (Int, Int) -> [(Int, Int)]
+mapRange (md, ms, mr) d (s, r)
+  -- total mapping
+  | s >= ms && (s + r) <= (ms + mr) =
+      let diff = md - ms
+       in [(s + diff, r)]
+  -- potential overlaps
+  | otherwise =
+      let (overLo, overHi) = (max ms s, min (s + r) (ms + mr) - 1)
+          diff = md - ms
+       in -- no overlap
+          if overHi <= overLo
+            then d [(s, r)] -- no mapping here...
+            else -- calculate overlap
+
+              let overMapping = (overLo + diff, (overHi - overLo) + 1)
+                  topSNumInRange = (s + r) - 1
+               in -- is there one left, or two?
+                  let (bl, bh) = (min overLo s, overLo - s)
+                      (tl, th) = (min overHi topSNumInRange, topSNumInRange - overHi)
+                   in case (bh, th) of
+                        (_, _) | bh > 0 && th > 0 -> overMapping : d [(bl, bh), (tl, th)]
+                        (_, _) | bh > 0 -> overMapping : d [(bl, bh)]
+                        (_, _) | th > 0 -> overMapping : d [(tl, th)]
+                        _ -> d [(s, r)]
+
+dataParser :: Parser Lookups
+dataParser =
   do
     seeds <- string "seeds:" *> many1 space *> lineParser
     many' endOfLine
-    seedtof <- lookupParser rev
-    soiltof <- lookupParser rev
-    ftow <- lookupParser rev
-    wtol <- lookupParser rev
-    ltot <- lookupParser rev
-    ttoh <- lookupParser rev
-    htol <- lookupParser rev
+    seedtof <- lookupParser
+    soiltof <- lookupParser
+    ftow <- lookupParser
+    wtol <- lookupParser
+    ltot <- lookupParser
+    ttoh <- lookupParser
+    htol <- lookupParser
     return
       Lookups
         { seeds = seeds,
@@ -101,53 +112,25 @@ dataParser rev =
           humidityToLocation = htol
         }
 
-part1, part2, part2V2 :: Lookups -> IO ()
+part1, part2 :: Lookups -> IO ()
 part1 lookups =
-  let locs = minimum $ seedToLocation lookups <$> seeds lookups
-    in
-    print locs
+  let locs = minimum $ seedToLocation lookups <$> fmap (,1) $ seeds lookups
+   in print locs
 
-expandSeeds :: [Int] -> [Int]
-expandSeeds (x:y:rest) =
-  [x..x + y - 1] ++ expandSeeds rest
-expandSeeds _ = []
-
-part2 lookups =
-  let locs = minimum $ seedToLocation lookups <$> expandSeeds (seeds lookups)
-    in
-      print locs
-
-seedRanges :: [Int] -> [(Int, Int)]
-seedRanges (x:y:rest) =
-  (x, y) : seedRanges rest
+seedRanges :: [Int] -> [[(Int, Int)]]
+seedRanges (x : y : rest) =
+  [(x, y)] : seedRanges rest
 seedRanges _ = []
 
-containsSeed :: Int -> [(Int, Int)] -> Bool
-
-containsSeed s ((s', r):rest) =
-  (s >= s' && s + s' < r) || containsSeed s rest
-containsSeed _ [] = False
-
-
-part2V2 lookups =
-  let cands = [0..1000000000]
-      ranges = seedRanges $ seeds lookups
-      locMapsToSeed x = containsSeed (locationToSeed lookups x) ranges
-      r = locationToSeed lookups 46
-      first = find locMapsToSeed cands
-      in
-        do
-        print r
-        case first of
-          Nothing -> putStrLn "no result found"
-          Just v -> print v
-
-
+part2 lookups =
+  let locs = seedToLocation lookups <$> seedRanges (seeds lookups)
+      m = minimum $ concat locs
+   in print m
 
 day05 :: IO ()
 day05 = do
   input <- getDataFileName "day05-input.txt" >>= TIO.readFile
   putStrLn "This is what I read from input:"
   TIO.putStrLn input
-  lookups <- either fail pure $ parseOnly (dataParser True) input
-  part2V2 lookups
+  lookups <- either fail pure $ parseOnly dataParser input
+  part2 lookups
