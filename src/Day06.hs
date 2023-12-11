@@ -11,22 +11,21 @@ data Race = Race {
   distance :: Int
 }
 
-dataParser :: Parser [Race]
+dataParser :: Parser Race
 dataParser =
   do
     string "Time:"
     skipSpace
-    times <- sepBy (many1 digit) (many1 (char ' '))
-    let timeInts = digitsToInt <$> times
+    times <- many1 digit
+    let timeInts = digitsToInt times
     many' endOfLine
     string "Distance:"
     skipSpace
-    dists <- sepBy (many1 digit) (many1 (char ' '))
-    let distInts = digitsToInt <$> dists
-    let races = fmap (\(t, d) -> Race {time = t, distance = d}) (timeInts `zip` distInts)
-    return races
+    dists <- many1 digit
+    let distInts = digitsToInt dists
+    return (Race {time = timeInts, distance = distInts})
 
--- length held, distance
+-- length held, time
 calculateDistance :: Int -> Int -> Int
 calculateDistance lh t = (t - lh) * lh
 
@@ -54,5 +53,5 @@ day06 = do
   TIO.putStrLn inputLines
   let racesEither = parseOnly dataParser inputLines
   races <- either fail pure racesEither
-  let productOfWins = foldr ((*) . calculateNumWins) 1 races
+  let productOfWins = calculateNumWins races
   print productOfWins
