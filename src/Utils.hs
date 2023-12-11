@@ -7,6 +7,9 @@ digitsToInt :: [Char] -> Int
 digitsToInt chs =
   snd $ foldl (\(base, acc) i -> (base * 10, i * base + acc)) (1, 0) (digitToInt <$> reverse chs)
 
+skipLine :: Parser ()
+skipLine = skipWhile (not . P.isEndOfLine) *> endOfLine
+
 surroundedBy :: P.Parser a -> P.Parser b -> P.Parser a
 surroundedBy pa pb =
   do
