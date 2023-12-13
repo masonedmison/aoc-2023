@@ -20,8 +20,8 @@ type Node = String
 
 type Network = M.Map Node (Node, Node)
 
-chooseDir :: Instruction -> Node -> Network -> Node
-chooseDir inst node net =
+chooseDir :: Instruction -> Network -> Node -> Node
+chooseDir inst net node =
   let toNodes = M.lookup node net
    in case toNodes of
         Nothing -> error "expected a mapped node pair"
@@ -29,17 +29,20 @@ chooseDir inst node net =
           L -> fst pair
           R -> snd pair
 
-traverseNetwork :: String -> [Instruction] -> Network -> Int
-traverseNetwork dest insts net =
-  traverseNetwork' insts "AAA" 0
-  where
-    traverseNetwork' insts curr count
-      | curr == dest = count
-      | otherwise = case insts of
-          (nextInst : rest) ->
-            let nextNode = chooseDir nextInst curr net
-             in traverseNetwork' rest nextNode (count + 1)
-          [] -> count
+traverseNetwork :: (String -> Bool) -> [Instruction] -> Network -> Int
+traverseNetwork isDest insts net =
+  let startingNodes = filter (\s -> last s == 'A') $ M.keys net
+    in
+    traverseNetwork' insts startingNodes 0
+    where
+      traverseNetwork' insts currNodes count
+        | all isDest currNodes = count
+        | otherwise = case insts of
+          (nextInst:rest) ->
+            let nextNodes =  chooseDir nextInst net <$> currNodes
+              in
+                traverseNetwork' rest nextNodes (count + 1)
+          [] -> count 
 
 parseInsts :: Parser [Instruction]
 parseInsts =
@@ -68,10 +71,10 @@ parseInput =
     tups <- sepBy parseNodeAndMappings endOfLine
     return (insts, M.fromList tups)
 
-part1 :: [Instruction] -> Network -> IO ()
-part1 insts net =
+part2 :: [Instruction] -> Network -> IO ()
+part2 insts net =
   let cycledInsts = cycle insts
-      count = traverseNetwork "ZZZ" cycledInsts net
+      count = traverseNetwork (\s -> last s == 'Z') cycledInsts net
    in print count
 
 day08 :: IO ()
@@ -83,4 +86,4 @@ day08 = do
   (insts, network) <- either fail pure parsedEither
   print insts
   print network
-  part1 insts network
+  part2 insts network
