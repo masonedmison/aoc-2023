@@ -1,11 +1,10 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Day08 where
 
 import Data.Attoparsec.Text
-import Data.Foldable (Foldable (fold))
 import qualified Data.Map.Strict as M
-import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Debug.Trace (trace)
 import Paths_aoc2023 (getDataFileName)
 
 data Instruction = R | L deriving (Show)
@@ -29,20 +28,17 @@ chooseDir inst net node =
           L -> fst pair
           R -> snd pair
 
-traverseNetwork :: (String -> Bool) -> [Instruction] -> Network -> Int
-traverseNetwork isDest insts net =
-  let startingNodes = filter (\s -> last s == 'A') $ M.keys net
-    in
-    traverseNetwork' insts startingNodes 0
-    where
-      traverseNetwork' insts currNodes count
-        | all isDest currNodes = count
-        | otherwise = case insts of
-          (nextInst:rest) ->
-            let nextNodes =  chooseDir nextInst net <$> currNodes
-              in
-                traverseNetwork' rest nextNodes (count + 1)
-          [] -> count 
+traverseNetwork :: String -> (String -> Bool) -> [Instruction] -> Network -> Int
+traverseNetwork src isDest insts net =
+  traverseNetwork' insts src 0
+  where
+    traverseNetwork' insts curr count
+      | isDest curr = count
+      | otherwise = case insts of
+          (nextInst : rest) ->
+            let nextNode = chooseDir nextInst net curr
+             in traverseNetwork' rest nextNode (count + 1)
+          [] -> count
 
 parseInsts :: Parser [Instruction]
 parseInsts =
@@ -51,15 +47,15 @@ parseInsts =
 parseNodeAndMappings :: Parser (Node, (Node, Node))
 parseNodeAndMappings =
   do
-    n <- many1 letter
+    n <- many1 (choice [letter, digit])
     skipSpace
     char '='
     skipSpace
     char ('(')
-    p1 <- many1 letter
+    p1 <- many1 (choice [letter, digit])
     char (',')
     skipSpace
-    p2 <- many1 letter
+    p2 <- many1 (choice [letter, digit])
     char ')'
     return (n, (p1, p2))
 
@@ -71,11 +67,14 @@ parseInput =
     tups <- sepBy parseNodeAndMappings endOfLine
     return (insts, M.fromList tups)
 
-part2 :: [Instruction] -> Network -> IO ()
+part2 :: [Instruction] -> Network -> Int
 part2 insts net =
-  let cycledInsts = cycle insts
-      count = traverseNetwork (\s -> last s == 'Z') cycledInsts net
-   in print count
+  foldr1 lcm individualCounts
+  where
+    cycledInsts = cycle insts
+    startingNodes = filter (\s -> last s == 'A') $ M.keys net
+    isDest s = last s == 'Z'
+    individualCounts = fmap (\n -> traverseNetwork n isDest cycledInsts net) startingNodes
 
 day08 :: IO ()
 day08 = do
@@ -84,6 +83,5 @@ day08 = do
   TIO.putStrLn input
   let parsedEither = parseOnly parseInput input
   (insts, network) <- either fail pure parsedEither
-  print insts
-  print network
-  part2 insts network
+  let count = part2 insts network
+  print count
