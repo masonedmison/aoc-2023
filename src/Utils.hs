@@ -4,8 +4,7 @@ import Data.Attoparsec.Text as P
 import Data.Char (digitToInt)
 
 digitsToInt :: [Char] -> Int
-digitsToInt chs =
-  snd $ foldl (\(base, acc) i -> (base * 10, i * base + acc)) (1, 0) (digitToInt <$> reverse chs)
+digitsToInt = read
 
 skipLine :: Parser ()
 skipLine = skipWhile (not . P.isEndOfLine) *> endOfLine
@@ -17,3 +16,10 @@ surroundedBy pa pb =
     r <- pa
     pb
     return r
+
+negNumParser :: P.Parser Int
+negNumParser =
+  do
+    minus <- many' $ char '-'
+    chs <- many1 digit
+    return (digitsToInt $ minus ++ chs)
