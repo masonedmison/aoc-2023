@@ -10,9 +10,8 @@ type Rows = [[Int]]
 
 processRow :: [Int] -> Int
 processRow is =
-  processRow' revIs [] [head revIs]
+  processRow' is [] [head is]
   where
-    revIs = reverse is
     processRow' (x : y : rest) curr acc =
       processRow' (y : rest) ((x - y) : curr) acc
     processRow' [] curr acc =
