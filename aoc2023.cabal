@@ -48,6 +48,7 @@ executable aoc2023
     Day23
     Day24
     Day25
+    Utils
 
   autogen-modules:
     Paths_aoc2023
@@ -58,3 +59,6 @@ executable aoc2023
       , mtl
       , attoparsec
       , containers
+      , vector
+      , fmt
+      , appendmap
