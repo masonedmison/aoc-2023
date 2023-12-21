@@ -9,6 +9,7 @@ import Utils (digitsToInt)
 import System.TimeIt (timeIt)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust, isJust)
+import Data.List (intercalate)
 
 -- current number of damaged springs, remaining row, groups
 type Row = (Int, String, [Int])
@@ -49,6 +50,11 @@ part1 inp =
   where
     counts = map (\(r, gs) -> computeRow M.empty (0, r, gs)) inp
 
+part2 inp =
+  part1 expanded
+  where
+    expanded = map (\(s, is) -> (intercalate "?" (replicate 5 s), concat (replicate 5 is))) inp
+
 inputParser :: Parser Input
 inputParser = do
   chs <- many1 (choice [char '.', char '?', char '#'])
@@ -64,4 +70,4 @@ day12 = do
   TIO.putStrLn $ T.unlines inputLines
   let csps' = parseOnly inputParser <$> inputLines
   csps <- either fail pure $ sequence csps'
-  timeIt $ print $ part1 csps
+  timeIt $ print $ part2 csps
