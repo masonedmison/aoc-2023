@@ -62,3 +62,7 @@ executable aoc2023
       , vector
       , fmt
       , appendmap
+      , tuple
+      , timeit
+      , listsafe
+      , split
