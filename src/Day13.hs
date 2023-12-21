@@ -5,6 +5,7 @@ import Data.Vector ((!), Vector)
 import qualified Data.Vector as V
 import Utils (transposeVec)
 import Data.List.Split
+import System.TimeIt (timeIt)
 
 type Grid = Vector (Vector Char)
 
@@ -16,7 +17,7 @@ parseInput st =
 
 checkReflection :: Int -> V.Vector Char -> Bool
 checkReflection n chs 
-  | (n - 1) > 0 && (n + 1) < V.length chs =
+  | n > 0 && n < V.length chs =
     foldr step True indicesToCheck
     where
       step (x, y) b
@@ -63,4 +64,4 @@ day13 = do
   putStrLn input
   let grids = parseInput input
   let result = part1 grids
-  print result
+  timeIt $ print result
