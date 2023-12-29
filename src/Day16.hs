@@ -1,11 +1,13 @@
+{-# LANGUAGE TupleSections #-}
+
 module Day16 where
 
 import Data.Foldable (Foldable (toList))
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes)
 import qualified Data.Vector as V
-import Debug.Trace (trace)
 import Paths_aoc2023 (getDataFileName)
+import System.TimeIt (timeIt)
 
 type Coord = (Int, Int)
 
@@ -42,18 +44,20 @@ vLookup v c d =
       | otherwise = NoCount
     visitedDirs = M.lookup c v
 
-data State = State {visited :: Visited, count :: Int} deriving (Show)
+data TSTate = TSTate {visited :: Visited, count :: Int} deriving (Show)
 
-new :: State
+type Cache = M.Map (Coord, Direction) Int
+
+new :: TSTate
 new =
-  State M.empty 0
+  TSTate M.empty 0
 
-withCount :: State -> (Int -> Int) -> State
+withCount :: TSTate -> (Int -> Int) -> TSTate
 withCount st f =
   let currCount = count st
    in st {count = f currCount}
 
-withVisited :: State -> (Visited -> Visited) -> State
+withVisited :: TSTate -> (Visited -> Visited) -> TSTate
 withVisited st f =
   let currVis = visited st
    in st {visited = f currVis}
@@ -84,7 +88,7 @@ getNextMoves inp c d
     nextFromDir = getNextFromCoordAndDir inp c
     ch = getCoord inp c
 
-processCell :: Input -> State -> Coord -> Direction -> (State, [(Coord, Direction)])
+processCell :: Input -> TSTate -> Coord -> Direction -> (TSTate, [(Coord, Direction)])
 processCell inp st c d = case vLookup (visited st) c d of
   Count -> (updateCountSt, nexts)
   NoCount -> (withVisited st (M.adjust (d :) c), nexts)
@@ -93,18 +97,31 @@ processCell inp st c d = case vLookup (visited st) c d of
     nexts = getNextMoves inp c d
     updateCountSt = withCount (withVisited st (M.insert c [d])) (+ 1)
 
-traverseI :: Input -> Int
-traverseI inp =
-  count $ go new initial
+traverseI :: (Coord, Direction) -> Input -> Int
+traverseI startCoord inp =
+  count $ go new startCoord
   where
-    initial = ((0, 0), E)
-    go :: State -> (Coord, Direction) -> State
+    go :: TSTate -> (Coord, Direction) -> TSTate
     go st (c, d) =
-      foldr step nextSt nexts
+      foldr (flip go) nextSt nexts
       where
-        (nextSt, nexts) =
-          processCell inp st c d
-        step (c, d) accSt = go accSt (c, d)
+        (nextSt, nexts) = processCell inp st c d
+
+part1, part2 :: Input -> Int
+part1 = traverseI ((0, 0), E)
+part2 inp =
+  foldr step 0 indicesToCheck
+  where
+    nCols = length (V.head inp) - 1
+    nRows = length inp - 1
+    upIndices = map (curry (,N) 0) [0 .. nCols]
+    downIndices = map (curry (,S) 0) [0 .. nCols]
+    rightIndices = map (curry (,E) 0) [0 .. nRows]
+    leftIndices = map (curry (,W) 0) [0 .. nRows]
+    indicesToCheck = upIndices ++ downIndices ++ rightIndices ++ leftIndices
+    step start maxAcc =
+      let sum = traverseI start inp
+       in max sum maxAcc
 
 day16 :: IO ()
 day16 = do
@@ -112,5 +129,5 @@ day16 = do
   putStrLn "This is what I read from input:"
   putStrLn $ unlines inputLines
   let input = V.fromList (V.fromList <$> inputLines)
-  let result = traverseI input
-  print result
+  let result = part2 input
+  timeIt $ print result
