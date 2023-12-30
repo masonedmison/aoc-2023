@@ -9,7 +9,6 @@ import qualified Data.Heap as H
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
-import Debug.Trace (trace)
 import Paths_aoc2023 (getDataFileName)
 import System.TimeIt (timeIt)
 
@@ -78,12 +77,11 @@ instance Ord Distance where
 class DijkstraGraph graph where
   edges :: graph -> Coord -> [(Coord, Distance, Direction)]
 
--- end, grid
 dijkstra :: Coord -> Coord -> Grid -> Distance
 dijkstra src end gr =
   minimum (fmap (\dc -> finalDists !?? (end, dc)) finalIndices)
   where
-    finalIndices = map (S,) [1 .. 3] ++ map (E,) [1 .. 3]
+    finalIndices = map (S,) [4 .. 10] ++ map (E,) [4 .. 10]
     finalDists = processQ initialSt
     initialSt = initSt src
     prune vis coord dc =
@@ -95,15 +93,18 @@ dijkstra src end gr =
     processQ :: DijkstraState -> DistMap
     processQ ds@(DijkstraState v0 d0 q0) = case H.view q0 of
       Nothing -> d0
-      Just ((_, (c, _)), _) | c == end -> d0
+      Just ((_, (c, (_, dirCount))), _) | c == end && dirCount >= 4 -> d0
       Just ((_, (c, d)), q1) | prune v0 c d -> processQ ds {queue = q1}
-      Just ((_, (coord, cdc@(currDir, _))), q1) ->
+      Just ((_, (coord, cdc@(currDir, currDirCount))), q1) ->
         let v1 = M.insert coord cdc v0
             allNeighbors = edges gr coord
             allNeighborsWithCurDc = fmap (\(c, d, dir) -> (c, d, addOne cdc dir)) allNeighbors
-            filterByDir (_, n) = n <= 3
-            validNeighbors = filter (\(n, _, ndc@(neighDir, _)) -> not (prune v1 n ndc) && filterByDir ndc && not (isReverse currDir neighDir)) allNeighborsWithCurDc
-         in processQ $
+            filterByDir (d, n)
+              | currDirCount > 0 && currDirCount < 4 = d == currDir
+              | otherwise = n <= 10
+            validNeighbors = filter (\(n, _, ndc@(d, _)) -> not (prune v1 n ndc) && filterByDir ndc && not (isReverse currDir d)) allNeighborsWithCurDc
+         in 
+          processQ $
               foldl' (foldNeighbor coord cdc) (DijkstraState v1 d0 q1) validNeighbors
 
 foldNeighbor :: Coord -> DirCount -> DijkstraState -> (Coord, Distance, DirCount) -> DijkstraState
@@ -132,8 +133,6 @@ part1 gr =
 day17 :: IO ()
 day17 = do
   input <- getDataFileName "day17-input.txt" >>= readFile
-  putStrLn "This is what I read from input:"
-  putStrLn input
   let grid = parseInput input
   let result = part1 grid
   timeIt $ print result
