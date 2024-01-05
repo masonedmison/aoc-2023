@@ -31,7 +31,7 @@ getNextFromCoordAndDir inp c d
 
 data Direction = N | S | E | W deriving (Eq, Show)
 
-data Status = Count | NoCount | Halt
+data Status = Count | Halt
 
 type Visited = M.Map Coord [Direction]
 
@@ -41,26 +41,8 @@ vLookup v c d =
   where
     visitedSt dirs
       | d `elem` dirs = Halt
-      | otherwise = NoCount
+      | otherwise = Count
     visitedDirs = M.lookup c v
-
-data TSTate = TSTate {visited :: Visited, count :: Int} deriving (Show)
-
-type Cache = M.Map (Coord, Direction) Int
-
-new :: TSTate
-new =
-  TSTate M.empty 0
-
-withCount :: TSTate -> (Int -> Int) -> TSTate
-withCount st f =
-  let currCount = count st
-   in st {count = f currCount}
-
-withVisited :: TSTate -> (Visited -> Visited) -> TSTate
-withVisited st f =
-  let currVis = visited st
-   in st {visited = f currVis}
 
 getNextMoves :: Input -> Coord -> Direction -> [(Coord, Direction)]
 getNextMoves inp c d
@@ -88,20 +70,19 @@ getNextMoves inp c d
     nextFromDir = getNextFromCoordAndDir inp c
     ch = getCoord inp c
 
-processCell :: Input -> TSTate -> Coord -> Direction -> (TSTate, [(Coord, Direction)])
-processCell inp st c d = case vLookup (visited st) c d of
+processCell :: Input -> Visited -> Coord -> Direction -> (Visited, [(Coord, Direction)])
+processCell inp vis c d = case vLookup vis c d of
   Count -> (updateCountSt, nexts)
-  NoCount -> (withVisited st (M.adjust (d :) c), nexts)
-  Halt -> (st, [])
+  Halt -> (vis, [])
   where
     nexts = getNextMoves inp c d
-    updateCountSt = withCount (withVisited st (M.insert c [d])) (+ 1)
+    updateCountSt = M.insert c [d] vis
 
 traverseI :: (Coord, Direction) -> Input -> Int
 traverseI startCoord inp =
-  count $ go new startCoord
+  length $ go M.empty startCoord
   where
-    go :: TSTate -> (Coord, Direction) -> TSTate
+    go :: Visited -> (Coord, Direction) -> Visited
     go st (c, d) =
       foldr (flip go) nextSt nexts
       where
@@ -114,10 +95,10 @@ part2 inp =
   where
     nCols = length (V.head inp) - 1
     nRows = length inp - 1
-    upIndices = map (,N) $ zip [0 .. nCols] (repeat 0)
+    upIndices = map (,N) $ zip [0 .. nCols] (repeat nRows)
     downIndices = map (,S) $ zip [0 .. nCols] (repeat 0)
     rightIndices = map (,E) $ zip (repeat 0) [0 .. nRows]
-    leftIndices = map (,W) $ zip (repeat 0) [0 .. nRows]
+    leftIndices = map (,W) $ zip (repeat nCols) [0 .. nRows]
     indicesToCheck = upIndices ++ downIndices ++ rightIndices ++ leftIndices
     step start maxAcc =
       let sum = traverseI start inp
