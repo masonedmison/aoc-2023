@@ -114,10 +114,10 @@ part2 inp =
   where
     nCols = length (V.head inp) - 1
     nRows = length inp - 1
-    upIndices = map (curry (,N) 0) [0 .. nCols]
-    downIndices = map (curry (,S) 0) [0 .. nCols]
-    rightIndices = map (curry (,E) 0) [0 .. nRows]
-    leftIndices = map (curry (,W) 0) [0 .. nRows]
+    upIndices = map (,N) $ zip [0 .. nCols] (repeat 0)
+    downIndices = map (,S) $ zip [0 .. nCols] (repeat 0)
+    rightIndices = map (,E) $ zip (repeat 0) [0 .. nRows]
+    leftIndices = map (,W) $ zip (repeat 0) [0 .. nRows]
     indicesToCheck = upIndices ++ downIndices ++ rightIndices ++ leftIndices
     step start maxAcc =
       let sum = traverseI start inp
